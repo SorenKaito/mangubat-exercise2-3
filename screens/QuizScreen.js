@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Button,
     StyleSheet,
@@ -6,14 +6,54 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { questions } from "../questions";
+import { useQuiz } from "../QuizContext";
 
 export default function QuizScreen({ navigation }) {
+  const { questions, timerSeconds } = useQuiz();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(timerSeconds);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const currentQuestion = questions[currentIndex];
+
+  useEffect(() => {
+    setTimeLeft(timerSeconds);
+    setCurrentIndex(0);
+    setAnswers({});
+    setScore(0);
+    setHasSubmitted(false);
+  }, [timerSeconds]);
+
+  useEffect(() => {
+    if (hasSubmitted) {
+      return;
+    }
+
+    if (timeLeft <= 0) {
+      const finalScore = calculateScore();
+      setScore(finalScore);
+      setHasSubmitted(true);
+      navigation.navigate("Result", { score: finalScore });
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [timeLeft, hasSubmitted, answers]);
+
+  const formatTime = (seconds) => {
+    const safeSeconds = Math.max(0, seconds);
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    const paddedMinutes = String(minutes).padStart(2, "0");
+    const paddedSeconds = String(remainingSeconds).padStart(2, "0");
+    return `${paddedMinutes}:${paddedSeconds}`;
+  };
 
   const handleSelect = (choice) => {
     const correctAnswer = currentQuestion.answer;
@@ -64,6 +104,8 @@ export default function QuizScreen({ navigation }) {
       setCurrentIndex(currentIndex + 1);
     } else {
       const finalScore = calculateScore();
+      setScore(finalScore);
+      setHasSubmitted(true);
       navigation.navigate("Result", { score: finalScore });
     }
   };
@@ -76,6 +118,7 @@ export default function QuizScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.timer}>Time left: {formatTime(timeLeft)}</Text>
       <Text style={styles.question}>
         {currentIndex + 1}. {currentQuestion.question}
       </Text>
@@ -112,6 +155,7 @@ export default function QuizScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: "center" },
+  timer: { fontSize: 18, marginBottom: 12, textAlign: "center" },
   question: { fontSize: 20, marginBottom: 20 },
   choice: {
     padding: 10,
